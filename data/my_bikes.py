@@ -2,40 +2,65 @@
 # Dublin Bikes scraper
 import pandas as pd
 import requests
-from time import sleep, strftime
+import time 
 import json
 import pywapi
 import sqlite3
 import os
 
-t = 120                        # number of seconds between samples
-
-def getData():
-
+def getStationData(dt):
+    """
+    Scrapes Dublin Bikes JSON station data, returns number of bikes, free stations and current time as a pandas dataframe
+    """
+    #grabs the current info for all Dublin Bikes from citybikes API
+    json_data = requests.get("http://api.citybik.es/dublinbikes.json") 
     decoder = json.JSONDecoder()
-    json_data = requests.get("http://api.citybik.es/dublinbikes.json") #grabs the current info for all Dublin Bikes from citybikes API
-    station_data = decoder.decode(json_data.content)               #decode the JSON data into a python readable form
-        
-    return station_data
+    #decode the JSON data into a pandas dataframe structure
+    station_data = pd.DataFrame(decoder.decode(json_data.content))               
+    station_data['time'] = dt
+ 
+    return station_data[['bikes','free','time']]
+
+def getWeatherData(dt):
+    """
+    Scrapes weather.com for "Dublin's current in pandas dataframe
+    """
+    weather_result = pywapi.get_weather_from_weather_com("EIXX0014") 
+    return pd.DataFrame([dt, str(weather_result['current_conditions']['text']), \
+                             str(weather_result['current_conditions']['temperature'])])
+
+def fileWrite(date, bikes, weather, form='sqlite'):
+    """
+    Write weather and station data to a CSV or sql db file
+    """
+    if form == 'CSV':
+        bikes.to_csv('bikes_' + date + '.csv', header=False, mode="a")
+        weather.to_csv('weather_' + date + '.csv', header=False, mode="a", index = False)
+    elif form == 'sqlite':
+        con = sqlite3.connect(date+'_bikes_and_weather.db')
+        bikes.to_sql('bikes', con, if_exists='append')
+        weather.to_sql('weather', con, if_exists='append', index = False)
+    else:
+        print 'Incompatible file type' 
 
 if __name__ == "__main__":
  
     while True:
+        try:
+            # Define global datetime of scraping 
+            now = time.strftime("%Y-%m-%d %H:%M:%S") 
+            # Date
+            todays_date = now.split()[0]             
+    
+            df_bikes = getStationData(now)
+            df_weather = getWeatherData(now)
+        
+            fileWrite(now,df_bikes,df_weather)
 
-        weather_result = pywapi.get_weather_from_weather_com("EIXX0014") 
-        weather_now = str(weather_result['current_conditions']['text']) 
-        temp_now = str(weather_result['current_conditions']['temperature'])
+            print "Data scraped successfully at " + now
 
-        df = pd.DataFrame(getData())
-        df['time'] = strftime("%Y-%m-%d %H:%M:%S") # Add timestamp of the sample
-        df['weather'] = weather_now
-        df['temperature'] = temp_now
+        except:
+            print "Connection Error, retrying in 120s"
+            pass
 
-        today = strftime("%Y-%m-%d") # We will store data daily
-        df[['bikes','free','time','weather','temperature']].to_csv('bikes_'+today+'.csv', header=False, mode="a")     # Write to CSV
-
-        con = sqlite3.connect('bikes_'+today+'.db')
-        df[['bikes','free','time','weather','temperature']].to_sql('bikes', con, if_exists='append')
-        print "Data scraped: " + strftime( "%H:%M:%S %d-%m-%Y ")
-        sleep(t)
-
+        time.sleep(120)
