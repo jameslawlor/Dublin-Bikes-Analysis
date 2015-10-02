@@ -20,6 +20,8 @@ Fluctations are also likely dependent on how bad the weather is, which we know a
 ## Installation
 
 Simply fork/clone the repo, data scraping is in the /data/ folder and analysis programs are in /analysis/.
+Requires the following python packages (most can be installed via 'pip'): pandas, json, pywapi (a weather API) and sqlite3.
+
 
 ## Usage
 
