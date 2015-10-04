@@ -1,0 +1,10 @@
+import matplotlib.pylab as plt
+from datetime import datetime
+fin = open('bikes.csv','r')
+
+for line in fin.readlines():
+	if line.split(",")[5] == "Portobello Harbour":
+		bikes = int(line.split(",")[1])
+		free = int(line.split(",")[1])
+		date = line.split(",")[-1][:-1]
+		print datetime.strptime(date,"%Y%m%d%H%M%S")
