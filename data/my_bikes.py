@@ -32,8 +32,12 @@ def getWeatherData(dt):
     weather_result = pywapi.get_weather_from_weather_com("EIXX0014") 
     return pd.DataFrame([[dt,
                             str(weather_result['current_conditions']['text']), \
-                            str(weather_result['current_conditions']['temperature'])]], \
-                        columns=['Time','Weather','Temperature'])
+                            str(weather_result['current_conditions']['temperature']), \
+                            str(weather_result['current_conditions']['feels_like']), \
+                            str(weather_result['current_conditions']['wind']['speed']) \
+                            ]], \
+
+                        columns=['Time','Weather','Temperature','Feels_Like','Wind_Speed'])
 
 def fileWrite(today, bikes, weather, form='sqlite'):
     """
