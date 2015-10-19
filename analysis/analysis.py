@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import scipy as sp
 import sqlite3
+import random
 import os
 import time
 import datetime
@@ -27,52 +28,97 @@ def bug_remove(dfs):
 
     return dfs
 
-def get_dfs(path=os.getcwd()):
+def get_dfs(station = None, path=os.getcwd()):
     """ Get all available databases of bikes and weather, return dict of { date : [bikes_dataframe, weather_dataframe] } 
     """
     df_dic = {}
     for db in os.listdir(path):
         if db.endswith(".db"):
             with sqlite3.connect(db) as con:
-                bikes = pd.read_sql_query("SELECT * FROM bikes", con)
+                if station: bikes = pd.read_sql_query("SELECT \"index\",\""+station+"\" FROM bikes", con)
+                else:       bikes = pd.read_sql_query("SELECT * FROM bikes", con)
                 weather = pd.read_sql_query("SELECT * FROM weather", con)
-            date = datetime.datetime.strptime( db.split("_")[0] , "%Y-%m-%d").date()
-
-            #convert timestamp string to a datetime time object
-            bikes = bikes.rename(columns = {'index' : 'Time'})
-            for df in [bikes, weather]:
-                df['Time'] = df['Time'].apply(lambda x : datetime.datetime.strptime(str(x),"%H:%M:%S").time())
-
-            df_dic[str(date)] = [bikes,weather]
+            # Only include full-day records, 2-minute intervals means 60*24/2 ~ 700 scrapes
+            if len(bikes['index']) > 700:
+                date = datetime.datetime.strptime( db.split("_")[0] , "%Y-%m-%d").date()
+                # Fix wind speed values and cast temperatures to integers
+                weather['Wind_Speed'] =  weather['Wind_Speed'].replace(to_replace = 'calm', value = 0)
+                weather[['Temperature', 'Feels_Like','Wind_Speed']] = weather[['Temperature',  'Feels_Like' ,'Wind_Speed']].astype(int)
+                #convert timestamp string to a datetime time object
+                bikes = bikes.rename(columns = {'index' : 'Time'})
+                for df in [bikes, weather]:
+                    df['Time'] = pd.to_datetime(df['Time'].apply(lambda x : datetime.datetime.strptime(str(date) + ' ' + str(x),"%Y-%m-%d %H:%M:%S")))
+                df_dic[str(date)] = [bikes,weather]
 
     return df_dic
 
+def get_weather_types(dic):
+
+    big_weather = pd.concat([dic[day][1] for day in dic])
+    return np.unique(big_weather['Weather'])
+
+def do_the_bins(big_df):
+    """
+    Calculates average weekday trends of general bikes usage. 
+    Uses custom binning routine due to irregular timestamps in the scraped data
+    """
+
+    def t_since_midnight(t):
+        # converts datetime object to integer seconds since midnight
+        return t.hour*3600 + t.minute*60 + t.second
+
+    # Create bins for the timestamps
+    bins = pd.Series( [ x*120 for x in xrange(0,720)  ] )
+
+    ts =  [datetime.datetime.utcfromtimestamp(x).time() for x in bins]
+
+    for day in big_df:
+        if datetime.datetime.strptime( day , "%Y-%m-%d").date().weekday()  <= 4:
+            bikes = big_df[day][0]
+            bikes['bins'] = np.digitize( bikes['Time'].apply(t_since_midnight) , bins)
+            bikes['sum'] = bikes.drop(['Time','bins'], axis=1).sum(axis=1)
+    
+    all_bikes = pd.concat([dfs[day][0][['sum','bins']] for day in dfs if datetime.datetime.strptime( day , "%Y-%m-%d").date().weekday()  <= 4])
+    grouped = all_bikes.groupby('bins')
+    print grouped['sum'].describe()
+    print grouped.mean()
+    print grouped['sum'].agg([np.sum, np.mean, np.std, len])
+    stats = grouped['sum'].agg([np.sum, np.mean, np.std, len])
+
+    fig, ax = plt.subplots(1)
+    ax.plot(ts, grouped['sum'].mean())
+    ax.fill_between(ts, stats['mean'] - stats['std'], stats['mean'] + stats['std'], facecolor='blue', alpha=0.5)
+    ax.grid()
+    plt.show()
+    stop
+
+#    plt.plot( ts , grouped['sum'].mean())
+#    plt.show()
+    
+    print all_bikes 
+
+    return
+
+
 if __name__ == "__main__":
 
+    station = 'Pearse_Street'
+    station = None
+
     # Get dataframes dictionary and remove API bug values        
-    dfs = bug_remove(get_dfs())
+    dfs = bug_remove(get_dfs(station))
+
+    stats_df = do_the_bins(dfs)
+    stop
 
     for str_date in dfs:
-        date = datetime.datetime.strptime( str_date , "%Y-%m-%d").date()
-        bikes = dfs[str_date][0]
-        weather = dfs[str_date][1]
-        if date.weekday() >= 0:
-            plt.plot(bikes['Time'], bikes.sum(axis=1))
-    plt.show()
-#
-#            print df_bikes.sum(axis = 1)
-##            stop
-#
-#            if date.weekday() == 0:
-#                plt.plot(df_bikes['Time'], df_bikes.sum(axis = 1), 'b')                
-#            if date.weekday() == 4:
-#                plt.plot(df_bikes['Time'], df_bikes.sum(axis = 1), 'r')                
+        [bikes, weather] = dfs[str_date]
+        print bikes['Time'].head()
 
-#            weather_types = np.unique(df_weather['Weather'])
+        if datetime.datetime.strptime( str_date , "%Y-%m-%d").date().weekday()  <= 4:
+            print str_date
+            plt.plot(bikes['Time'].apply(lambda x : x.time()), pd.rolling_mean(bikes.sum(axis=1) , 5) )
+#            plt.plot(weather['Time'], weather['Weather'])
+            plt.show()
 
-            # If Mon-Fri 
-#            if date.weekday() < 5:
-#                station = 'Pearse_Street'
-#                pbh = df_bikes[['Time',station]]
-#                plt.plot(pbh['Time'],pbh[station],'rx')
-#    plt.show()
+
