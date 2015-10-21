@@ -28,13 +28,13 @@ def bug_remove(dfs):
 
     return dfs
 
-def get_dfs(station = None, path=os.getcwd()):
+def get_dfs(station = None, path='./data/'):
     """ Get all available databases of bikes and weather, return dict of { date : [bikes_dataframe, weather_dataframe] } 
     """
     df_dic = {}
     for db in os.listdir(path):
         if db.endswith(".db"):
-            with sqlite3.connect(db) as con:
+            with sqlite3.connect(path+db) as con:
                 if station: bikes = pd.read_sql_query("SELECT \"index\",\""+station+"\" FROM bikes", con)
                 else:       bikes = pd.read_sql_query("SELECT * FROM bikes", con)
                 weather = pd.read_sql_query("SELECT * FROM weather", con)
@@ -78,8 +78,8 @@ def do_the_bins(big_df, days = 'weekdays'):
         bikes_df['sum'] = bikes_df.drop(['Time','bins'], axis=1).sum(axis=1)
         return
 
-    # Create bins for the timestamps
-    bins = pd.Series( [ x*120 for x in xrange(0,720)  ] )
+    # Create bins for the timestamps as seconds since midnight
+    bins = pd.Series( [  (x+1)*120 for x in xrange(0,720)  ] )
 
     # Weekdays and Weekends have different usage trends so only pick one, default is weekdays
     if days == 'weekdays':
@@ -95,31 +95,47 @@ def do_the_bins(big_df, days = 'weekdays'):
                 add_bins_sums(big_df[day][0], bins)
         all_bikes = pd.concat([dfs[day][0][['sum','bins']] for day in dfs if datetime.datetime.strptime( day , "%Y-%m-%d").date().weekday()  > 4])
 
-
     # Groups data by timestamp bin, takes the 'sum' column and aggregates giving a dataframe 'stats' with the sum, mean, standard dev and observations at each time bin
     stats = all_bikes.groupby('bins')['sum'].agg([np.sum, np.mean, np.std, len])
 
-    # Generates timestamps for plotting
-    ts =  [datetime.datetime.utcfromtimestamp(x).time() for x in bins]
-
-
-    # Make a plot
-    fig, ax = plt.subplots(1)
-    ax.plot(ts, stats['mean'])
-    ax.fill_between(ts, stats['mean'] - stats['std'], stats['mean'] + stats['std'], facecolor='blue', alpha=0.5)
-    ax.grid()
-    plt.show()
-
-    return
-
+    return stats, bins
 
 if __name__ == "__main__":
 
-    station = 'Pearse_Street'
+#    station = 'Pearse_Street'
     station = None
+    save = True 
+    select_days = ['weekdays', 'weekends']
 
-    # Get dataframes dictionary and remove API bug values        
-    dfs = bug_remove(get_dfs(station))
-
-    stats_df = do_the_bins(dfs,'weekends')
-
+    # Must handle weekdays and weekends separately
+    for chosen_days in select_days:
+        # Get dataframes dictionary and remove API bug values        
+        dfs = bug_remove(get_dfs(station))
+    
+        # Get mean and STD from data
+        stats_df , bins = do_the_bins(dfs,chosen_days)
+    
+        # Converts seconds from midnight into a timestamp for saving and plotting
+        ts =  [datetime.datetime.utcfromtimestamp(x).time() for x in bins]
+    
+        # Save or make a plot
+        if save == True:
+            # Save the data to a CSV for future plotting and analysis
+            out_df = pd.concat( [bins,  stats_df[['mean' , 'std']]], axis=1 )
+            # Do some tidying
+            out_df = out_df.rename(columns = {0:'time'})
+            out_df['time'] = out_df['time'].apply(lambda x : ( datetime.datetime.utcfromtimestamp(x-120)).time())
+            dates = sorted([datetime.datetime.strptime(day, "%Y-%m-%d").date() for day in dfs])
+            path = 'mean_and_std_' + str(dates[0]) + '_to_' + str(dates[-1]) + '_' + chosen_days + '.dat'
+            print 'CSV saved to ' + path 
+            out_df.to_csv(path)
+   
+        else:
+            ts =  [datetime.datetime.utcfromtimestamp(x).time() for x in bins]
+            # Make a plot
+            fig, ax = plt.subplots(1)
+            ax.plot(ts, stats_df['mean'])
+            ax.fill_between(ts, stats_df['mean'] - stats_df['std'], stats_df['mean'] + stats_df['std'], facecolor='blue', alpha=0.5)
+            ax.grid()
+            plt.show()
+    
