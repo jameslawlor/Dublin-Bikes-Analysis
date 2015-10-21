@@ -53,11 +53,13 @@ def get_dfs(station = None, path=os.getcwd()):
     return df_dic
 
 def get_weather_types(dic):
-
+    """
+    Returns numpy array of unique weather types
+    """
     big_weather = pd.concat([dic[day][1] for day in dic])
     return np.unique(big_weather['Weather'])
 
-def do_the_bins(big_df):
+def do_the_bins(big_df, days = 'weekdays'):
     """
     Calculates average weekday trends of general bikes usage. 
     Uses custom binning routine due to irregular timestamps in the scraped data
@@ -67,35 +69,46 @@ def do_the_bins(big_df):
         # converts datetime object to integer seconds since midnight
         return t.hour*3600 + t.minute*60 + t.second
 
+    def add_bins_sums(bikes_df, bin_list):
+        """
+        Takes in a bikes dataframe, adds columns for each timestamp for which bin
+        the timestamp is in and the sum of bikes at that point in time
+        """
+        bikes_df['bins'] = np.digitize( bikes_df['Time'].apply(t_since_midnight) , bin_list)
+        bikes_df['sum'] = bikes_df.drop(['Time','bins'], axis=1).sum(axis=1)
+        return
+
     # Create bins for the timestamps
     bins = pd.Series( [ x*120 for x in xrange(0,720)  ] )
 
+    # Weekdays and Weekends have different usage trends so only pick one, default is weekdays
+    if days == 'weekdays':
+        for day in big_df:
+            if datetime.datetime.strptime( day , "%Y-%m-%d").date().weekday()  <= 4:
+                add_bins_sums(big_df[day][0], bins)
+        # Make DF of all bikes
+        all_bikes = pd.concat([dfs[day][0][['sum','bins']] for day in dfs if datetime.datetime.strptime( day , "%Y-%m-%d").date().weekday()  <= 4])
+
+    elif days == 'weekends':
+        for day in big_df:
+            if datetime.datetime.strptime( day , "%Y-%m-%d").date().weekday()  > 4:
+                add_bins_sums(big_df[day][0], bins)
+        all_bikes = pd.concat([dfs[day][0][['sum','bins']] for day in dfs if datetime.datetime.strptime( day , "%Y-%m-%d").date().weekday()  > 4])
+
+
+    # Groups data by timestamp bin, takes the 'sum' column and aggregates giving a dataframe 'stats' with the sum, mean, standard dev and observations at each time bin
+    stats = all_bikes.groupby('bins')['sum'].agg([np.sum, np.mean, np.std, len])
+
+    # Generates timestamps for plotting
     ts =  [datetime.datetime.utcfromtimestamp(x).time() for x in bins]
 
-    for day in big_df:
-        if datetime.datetime.strptime( day , "%Y-%m-%d").date().weekday()  <= 4:
-            bikes = big_df[day][0]
-            bikes['bins'] = np.digitize( bikes['Time'].apply(t_since_midnight) , bins)
-            bikes['sum'] = bikes.drop(['Time','bins'], axis=1).sum(axis=1)
-    
-    all_bikes = pd.concat([dfs[day][0][['sum','bins']] for day in dfs if datetime.datetime.strptime( day , "%Y-%m-%d").date().weekday()  <= 4])
-    grouped = all_bikes.groupby('bins')
-    print grouped['sum'].describe()
-    print grouped.mean()
-    print grouped['sum'].agg([np.sum, np.mean, np.std, len])
-    stats = grouped['sum'].agg([np.sum, np.mean, np.std, len])
 
+    # Make a plot
     fig, ax = plt.subplots(1)
-    ax.plot(ts, grouped['sum'].mean())
+    ax.plot(ts, stats['mean'])
     ax.fill_between(ts, stats['mean'] - stats['std'], stats['mean'] + stats['std'], facecolor='blue', alpha=0.5)
     ax.grid()
     plt.show()
-    stop
-
-#    plt.plot( ts , grouped['sum'].mean())
-#    plt.show()
-    
-    print all_bikes 
 
     return
 
@@ -108,17 +121,5 @@ if __name__ == "__main__":
     # Get dataframes dictionary and remove API bug values        
     dfs = bug_remove(get_dfs(station))
 
-    stats_df = do_the_bins(dfs)
-    stop
-
-    for str_date in dfs:
-        [bikes, weather] = dfs[str_date]
-        print bikes['Time'].head()
-
-        if datetime.datetime.strptime( str_date , "%Y-%m-%d").date().weekday()  <= 4:
-            print str_date
-            plt.plot(bikes['Time'].apply(lambda x : x.time()), pd.rolling_mean(bikes.sum(axis=1) , 5) )
-#            plt.plot(weather['Time'], weather['Weather'])
-            plt.show()
-
+    stats_df = do_the_bins(dfs,'weekends')
 
