@@ -29,4 +29,9 @@ Data for the number of bikes at a station is scraped in real-time for each stati
 This data is saved to a sql database using a naming scheme of YYYY-MM-DD_bikes_and_weather.db which contains separate tables for the bikes and weather data.
 Data is arranged in rows by timestamp of the scraping, and columns are either the station name in table 'bikes' or weather information in table 'weather' (more specifically, |weather text description| Temperature | Effective Temp. | Wind Speed |).
 
-Analysis: coming soon
+## Analysis
+
+Some munging and preparation for plotting is done in analysis/analysis.py.
+ When this script runs the data in the specified date ranges and stations is processed and output into a CSV file or a plot if required.
+ The script make_nice_plots.py can then be run which generates a 'nicer' looking plot which can then be saved.
+ An example of this output can be found at analysis/example.png which shows the average total usage over the weekdays in one week.

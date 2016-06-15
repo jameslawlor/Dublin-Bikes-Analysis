@@ -7,7 +7,7 @@ import datetime
 import matplotlib.pylab as plt
 from matplotlib import dates
 
-paths = ["mean_and_std_2015-09-25_to_2015-10-20_weekdays.dat","mean_and_std_2015-09-25_to_2015-10-20_weekends.dat"]
+#paths = ["mean_and_std_2015-09-25_to_2015-10-20_weekdays.dat","mean_and_std_2015-09-25_to_2015-10-20_weekends.dat"]
 
 paths = ["mean_and_std_2015-09-25_to_2015-10-20_weekdays.dat"]
 
@@ -37,7 +37,7 @@ for i, path in enumerate(paths):
     plt.title("DublinBikes average weekday usage", fontsize=22)  
 
     plt.xlabel("\nData source: CityBikes http://api.citybik.es/ | " 
-           "Author: James Lawlor @Owl_Meat", fontsize=10)
+           "Author: James Lawlor @lawlorino", fontsize=10)
 
 
     ax.plot(ts, df['mean'], color='black')

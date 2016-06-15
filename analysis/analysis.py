@@ -50,7 +50,7 @@ def get_dfs(station = None, path='./data/'):
           "SELECT \"index\",\""+station+"\" FROM bikes", con)
         else:       bikes = pd.read_sql_query(
           "SELECT * FROM bikes", con)
-           weather = pd.read_sql_query("SELECT * FROM weather", con)
+        weather = pd.read_sql_query("SELECT * FROM weather", con)
         # Only include full-day records, 2-minute intervals
         # means 60*24/2 ~ 700 scrapes
         if len(bikes['index']) > 700:
@@ -59,8 +59,9 @@ def get_dfs(station = None, path='./data/'):
         # Fix wind speed values and cast temperatures to integers
           weather['Wind_Speed'] =  weather['Wind_Speed'].replace(
                                      to_replace = 'calm', value = 0)
-          weather[['Temperature', 'Feels_Like','Wind_Speed']] =
-              weather[['Temperature',  'Feels_Like' ,'Wind_Speed']].astype(int)
+          weather[['Temperature', 'Feels_Like','Wind_Speed']] = weather[
+            ['Temperature',  'Feels_Like' ,'Wind_Speed']
+            ].astype(int)
           #convert timestamp string to a datetime time object
           bikes = bikes.rename(columns = {'index' : 'Time'})
           for df in [bikes, weather]:
@@ -94,11 +95,11 @@ def do_the_bins(big_df, days = 'weekdays'):
     Takes in a bikes dataframe, adds columns for each timestamp for
     which bin the timestamp is in and the sum of bikes at that point in time
     """
-     bikes_df['bins'] = np.digitize(
+    bikes_df['bins'] = np.digitize(
                          bikes_df['Time'].apply(t_since_midnight) , bin_list)
-     bikes_df['sum'] = bikes_df.drop(
+    bikes_df['sum'] = bikes_df.drop(
                          ['Time','bins'], axis=1).sum(axis=1)
-     return
+    return
 
   # Create bins for the timestamps as seconds since midnight
   bins = pd.Series( [  (x+1)*120 for x in xrange(0,720)  ] )
@@ -132,7 +133,7 @@ if __name__ == "__main__":
 
 #    station = 'Pearse_Street'
   station = None
-  save = True 
+  save = False 
   select_days = ['weekdays', 'weekends']
 
   # Must handle weekdays and weekends separately
@@ -153,13 +154,13 @@ if __name__ == "__main__":
          (datetime.datetime.utcfromtimestamp(x-120)).time())
       dates = sorted([
         datetime.datetime.strptime(day, "%Y-%m-%d").date() for day in dfs])
-      path = 'mean_and_std_' + str(dates[0])
-        +'_to_'+str(dates[-1])+'_'+chosen_days+'.dat'
+      path = 'mean_and_std_' + str(dates[0]) + '_to_' + \
+         str(dates[-1])+'_'+chosen_days+'.dat'
       print 'CSV saved to ' + path 
       out_df.to_csv(path)
  
     else:
-      ts =  [datetime.datetime.utcfromtimestamp(x).time() for x in bins]
+      ts = [datetime.datetime.utcfromtimestamp(x).time() for x in bins]
       # Make a plot
       fig, ax = plt.subplots(1)
       ax.plot(ts, stats_df['mean'])
