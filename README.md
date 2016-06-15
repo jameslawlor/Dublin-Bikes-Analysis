@@ -1,8 +1,7 @@
 ## Synopsis
 
-At the top of the file there should be a short introduction and/ or overview that explains **what** the project is. This description should match descriptions added for package managers (Gemspec, package.json, etc.)
-
-This project aims to analyse trends in the usage of Dublin Bikes, a public bike rental scheme in Dublin, Ireland. 
+This project aims to analyse trends in the usage of Dublin Bikes, a public bike rental scheme in Dublin, Ireland, using some Python scripts to scrape the API data, save to SQL format, and then later plot this data. 
+Example output can be found in analysis/example.png
 
 
 ## Code Example
